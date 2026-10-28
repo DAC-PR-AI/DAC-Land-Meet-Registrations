@@ -40,7 +40,7 @@ export const EVENT = {
     { name: "Redevelopment Projects", line: "Reimagine | Rebuild | Create Value" },
   ],
 
-  participantTypes: ["Landowner (Vendor)", "Mediator", "Property Consultant"],
+  participantTypes: ["Mediator", "Property Consultant"],
   interestOptions: ["Outright", "Joint Venture", "Redevelopment"],
   locationOptions: ["OMR", "GST", "Avadi", "Redhill", "Poonamallee", "Porur", "Sunguvarchatram", "Other"],
   maxPersons: 3,

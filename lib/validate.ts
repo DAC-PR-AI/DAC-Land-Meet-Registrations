@@ -59,7 +59,7 @@ export function validateRegistration(raw: Record<string, unknown>): {
     errors.participantType = "Please choose who you are.";
   if (data.name.length < 2) errors.name = "Please enter your full name.";
   if (!/^[6-9]\d{9}$/.test(data.mobile)) errors.mobile = "Please enter a valid 10-digit mobile number.";
-  if (!EMAIL_RE.test(data.email)) errors.email = "Please enter a valid email ID.";
+  if (data.email && !EMAIL_RE.test(data.email)) errors.email = "Please enter a valid email ID.";
   if (data.persons < 1 || data.persons > EVENT.maxPersons)
     errors.persons = `Choose between 1 and ${EVENT.maxPersons} persons.`;
   if (!data.consent) errors.consent = "Please tick this box to continue.";

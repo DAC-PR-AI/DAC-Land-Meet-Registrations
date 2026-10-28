@@ -92,7 +92,7 @@ function register_(b) {
   var email = clean_(b.email, 120).toLowerCase();
   if (!/^[6-9]\d{9}$/.test(mobile)) return { ok: false, error: 'Invalid mobile number', code: 'VALIDATION' };
   if (name.length < 2) return { ok: false, error: 'Invalid name', code: 'VALIDATION' };
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, error: 'Invalid email', code: 'VALIDATION' };
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return { ok: false, error: 'Invalid email', code: 'VALIDATION' };
   var persons = Math.min(3, Math.max(1, parseInt(b.persons, 10) || 1));
 
   var lock = LockService.getScriptLock();
@@ -369,6 +369,7 @@ function esc_(s) {
 
 function sendPassEmail_(p) {
   try {
+    if (!p.email) return 'Not provided';
     if (MailApp.getRemainingDailyQuota() < 1) return 'Not sent: daily email quota exceeded';
     var passUrl = passUrl_(p.passId, p.key);
     MailApp.sendEmail({

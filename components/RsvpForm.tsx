@@ -23,7 +23,7 @@ const INITIAL: FormState = {
   consent: false,
 };
 
-const ORDER: (keyof FormState)[] = ["participantType", "name", "mobile", "email", "persons", "consent"];
+const ORDER: (keyof FormState)[] = ["participantType", "name", "mobile", "persons", "consent"];
 
 export default function RsvpForm() {
   const router = useRouter();
@@ -126,7 +126,7 @@ export default function RsvpForm() {
         {/* I am a */}
         <fieldset>
           <legend className="field-label">I am a <Req /></legend>
-          <div id="f-participantType" role="radiogroup" aria-label="I am a" tabIndex={-1} className="grid grid-cols-1 gap-2 outline-none sm:grid-cols-3">
+          <div id="f-participantType" role="radiogroup" aria-label="I am a" tabIndex={-1} className="grid grid-cols-2 gap-2 outline-none">
             {EVENT.participantTypes.map((t) => (
               <button key={t} type="button" role="radio" aria-checked={f.participantType === t}
                 onClick={() => { set("participantType", t); setTouched((x) => ({ ...x, participantType: true })); }}
@@ -166,13 +166,13 @@ export default function RsvpForm() {
 
         {/* Email */}
         <div>
-          <label htmlFor="f-email" className="field-label">Email ID <Req /></label>
+          <label htmlFor="f-email" className="field-label">Email ID <Opt /></label>
           <input id="f-email" className="field-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
-            placeholder="name@example.com" value={f.email} maxLength={120}
+            placeholder="name@example.com (optional)" value={f.email} maxLength={120}
             onChange={(e) => set("email", e.target.value.trim())} onBlur={() => blur("email")}
             aria-invalid={!!err("email")} aria-describedby={err("email") ? "e-email" : "h-email"} />
           {err("email") ? <p id="e-email" className="field-error">{err("email")}</p>
-            : <p id="h-email" className="mt-1 text-xs sm:text-sm text-slate-500">We will email your Entry Pass here.</p>}
+            : <p id="h-email" className="mt-1 text-xs sm:text-sm text-slate-500">Optional. If provided, we will email your Entry Pass.</p>}
         </div>
 
         {/* Firm */}
