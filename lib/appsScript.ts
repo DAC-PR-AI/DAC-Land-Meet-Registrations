@@ -59,8 +59,22 @@ export async function callScript<T extends ScriptResponse = ScriptResponse>(
 export function errorJson(e: unknown, status = 502) {
   const err = e as ScriptError;
   console.error("[api]", err?.code, err?.message);
+
+  let userMessage = `Something went wrong. Please try again, or call ${EVENT.phoneShort} for help.`;
+  if (err?.code === "CONFIG") {
+    userMessage = `Configuration Error: ${err.message} Please add them in Vercel Settings > Environment Variables and redeploy.`;
+  } else if (err?.code === "AUTH" || err?.message === "Unauthorized") {
+    userMessage = `Authentication Error: APPS_SCRIPT_SECRET in Vercel does not match the Script Property APPS_SCRIPT_SECRET in Google Apps Script.`;
+  } else if (err?.code === "BAD_RESPONSE") {
+    userMessage = `Deployment Error: Invalid response from Google Apps Script. Ensure Web App access is set to "Anyone" (not "Only myself") and the URL ends with /exec.`;
+  } else if (err?.code === "NETWORK") {
+    userMessage = `Network Error: Could not connect to Google Apps Script (${err.message}).`;
+  } else if (err?.message && err.message !== "Backend error") {
+    userMessage = `Backend Error: ${err.message}`;
+  }
+
   return Response.json(
-    { ok: false, error: `Something went wrong. Please try again, or call ${EVENT.phoneShort} for help.` },
+    { ok: false, error: userMessage, code: err?.code },
     { status }
   );
 }
