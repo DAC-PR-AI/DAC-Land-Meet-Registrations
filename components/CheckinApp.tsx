@@ -7,6 +7,46 @@ import Logo from "./Logo";
 
 const PIN_KEY = "dac_checkin_pin";
 
+function playSuccessBeep() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    const now = ctx.currentTime;
+    osc.frequency.setValueAtTime(880, now); // A5
+    osc.frequency.setValueAtTime(1174.66, now + 0.08); // D6
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
+    osc.start(now);
+    osc.stop(now + 0.22);
+  } catch {}
+}
+
+function playWarningBeep() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sawtooth";
+    const now = ctx.currentTime;
+    osc.frequency.setValueAtTime(280, now);
+    osc.frequency.setValueAtTime(200, now + 0.12);
+    gain.gain.setValueAtTime(0.2, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.26);
+    osc.start(now);
+    osc.stop(now + 0.26);
+  } catch {}
+}
+
 type Result =
   | { kind: "valid"; pass: Pass }
   | { kind: "done"; pass: Pass; time: string }
@@ -109,6 +149,47 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
     return () => clearInterval(t);
   }, [loadStats]);
 
+  // Auto-reset back to camera scanning for next guest
+  useEffect(() => {
+    if (!result) return;
+    const delay = result.kind === "done" ? 2200 : result.kind === "already" ? 3200 : 2600;
+    const timer = setTimeout(() => {
+      setResult(null);
+      setError("");
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [result]);
+
+  // Fast 1-step checkin on QR scan: single roundtrip, no manual confirm button needed
+  const fastScanCheckin = useCallback(async (q: string) => {
+    const clean = q.trim();
+    if (!clean) return;
+    setBusy(true);
+    setError("");
+    try {
+      const d = await api("/api/checkin/mark", { passId: clean });
+      if (!d.found) {
+        setResult({ kind: "notfound", query: clean });
+        playWarningBeep();
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+      } else if (d.alreadyCheckedIn) {
+        setResult({ kind: "already", pass: d.pass, time: d.checkinTime });
+        playWarningBeep();
+        if (navigator.vibrate) navigator.vibrate([150, 100, 150]);
+      } else {
+        setResult({ kind: "done", pass: d.pass, time: d.checkinTime });
+        playSuccessBeep();
+        if (navigator.vibrate) navigator.vibrate(80);
+      }
+      loadStats();
+    } catch (e) {
+      setError((e as Error).message + `. If this continues, call ${EVENT.phoneShort}.`);
+    } finally {
+      setBusy(false);
+    }
+  }, [api, loadStats]);
+
+  // Manual search lookup (for typing mobile numbers or pass IDs)
   const lookup = useCallback(async (q: string) => {
     const clean = q.trim();
     if (!clean) return;
@@ -116,10 +197,16 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
     setError("");
     try {
       const d = await api("/api/checkin/lookup", { query: clean });
-      if (!d.found) setResult({ kind: "notfound", query: clean });
-      else if (d.pass.checkedIn) setResult({ kind: "already", pass: d.pass, time: d.pass.checkinTime });
-      else setResult({ kind: "valid", pass: d.pass });
-      if (navigator.vibrate) navigator.vibrate(d.found && !d.pass.checkedIn ? 80 : [60, 60, 60]);
+      if (!d.found) {
+        setResult({ kind: "notfound", query: clean });
+        playWarningBeep();
+      } else if (d.pass.checkedIn) {
+        setResult({ kind: "already", pass: d.pass, time: d.pass.checkinTime });
+        playWarningBeep();
+      } else {
+        setResult({ kind: "valid", pass: d.pass });
+        if (navigator.vibrate) navigator.vibrate(80);
+      }
     } catch (e) {
       setError((e as Error).message + `. If this continues, call ${EVENT.phoneShort}.`);
     } finally {
@@ -132,9 +219,16 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
     setError("");
     try {
       const d = await api("/api/checkin/mark", { passId });
-      if (!d.found) setResult({ kind: "notfound", query: passId });
-      else if (d.alreadyCheckedIn) setResult({ kind: "already", pass: d.pass, time: d.checkinTime });
-      else setResult({ kind: "done", pass: d.pass, time: d.checkinTime });
+      if (!d.found) {
+        setResult({ kind: "notfound", query: passId });
+        playWarningBeep();
+      } else if (d.alreadyCheckedIn) {
+        setResult({ kind: "already", pass: d.pass, time: d.checkinTime });
+        playWarningBeep();
+      } else {
+        setResult({ kind: "done", pass: d.pass, time: d.checkinTime });
+        playSuccessBeep();
+      }
       loadStats();
     } catch (e) {
       setError((e as Error).message);
@@ -167,14 +261,14 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
         {(["scan", "search"] as const).map((m) => (
           <button key={m} role="tab" aria-selected={mode === m} onClick={() => { setMode(m); reset(); }}
             className={`h-12 rounded-lg text-[15px] font-semibold transition ${mode === m ? "bg-white text-navy shadow" : "text-slate-500"}`}>
-            {m === "scan" ? "Scan QR" : "Search"}
+            {m === "scan" ? "⚡ Fast Scanner" : "Search"}
           </button>
         ))}
       </div>
 
       <div className="mt-4">
         {mode === "scan" ? (
-          <Scanner paused={!!result || busy} onScan={lookup} />
+          <Scanner paused={!!result || busy} onScan={fastScanCheckin} />
         ) : (
           <form onSubmit={(e) => { e.preventDefault(); lookup(query); }} className="flex gap-2">
             <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Mobile no. or Pass ID (e.g. 12)"
@@ -205,11 +299,12 @@ function StatBox({ label, value, sub, accent }: { label: string; value?: number;
 function ResultCard({ result, busy, onMark, onNext }: { result: Result; busy: boolean; onMark: (id: string) => void; onNext: () => void }) {
   if (result.kind === "notfound") {
     return (
-      <div className="fade-up mt-5 rounded-2xl border-4 border-red-500 bg-red-50 p-6 text-center" role="alert">
+      <div onClick={onNext} className="fade-up mt-5 cursor-pointer rounded-2xl border-4 border-red-500 bg-red-50 p-6 text-center" role="alert">
         <p className="text-3xl font-extrabold text-red-600">NO PASS FOUND</p>
         <p className="mt-2 break-all text-slate-600">Searched: {result.query}</p>
         <p className="mt-1 text-sm text-slate-500">Try searching by mobile number, or direct the guest to the help desk.</p>
-        <button onClick={onNext} className="btn-navy mt-5 w-full">Next guest</button>
+        <p className="mt-4 text-xs font-medium text-slate-400">Auto-clearing in 2s · Tap to scan now</p>
+        <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="btn-navy mt-3 w-full">Next guest</button>
       </div>
     );
   }
@@ -217,40 +312,39 @@ function ResultCard({ result, busy, onMark, onNext }: { result: Result; busy: bo
   const p = result.pass;
   const tone =
     result.kind === "valid" ? "border-green-500 bg-white" :
-    result.kind === "done" ? "border-green-500 bg-green-50" : "border-amber-500 bg-amber-50";
+    result.kind === "done" ? "border-green-500 bg-green-50/90" : "border-amber-500 bg-amber-50";
 
   return (
-    <div className={`fade-up mt-5 rounded-2xl border-4 p-5 ${tone}`} aria-live="polite">
-      <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-[15px]">
-        <dt className="text-slate-500">Name</dt><dd className="font-bold text-navy">{p.name}</dd>
-        <dt className="text-slate-500">Type</dt><dd className="text-navy">{p.participantType}</dd>
-        {p.firm && (<><dt className="text-slate-500">Firm</dt><dd className="text-navy">{p.firm}</dd></>)}
-        <dt className="text-slate-500">Persons</dt><dd className="text-2xl font-extrabold text-accent">Admit {p.persons}</dd>
-        <dt className="text-slate-500">Pass ID</dt><dd className="font-mono font-bold text-navy">{p.passId}</dd>
-        <dt className="text-slate-500">Status</dt>
-        <dd className="font-semibold">
-          {result.kind === "valid" ? <span className="text-green-700">Valid – not yet checked-in</span>
-            : <span className={result.kind === "done" ? "text-green-700" : "text-amber-700"}>Checked-in</span>}
-        </dd>
-      </dl>
-
-      {result.kind === "valid" && (
-        <button onClick={() => onMark(p.passId)} disabled={busy}
-          className="btn mt-5 h-16 w-full bg-green-600 text-lg font-extrabold text-white hover:bg-green-700">
-          {busy ? <span className="spinner" /> : "VALID – Mark Checked-in"}
-        </button>
-      )}
+    <div onClick={onNext} className={`fade-up mt-5 cursor-pointer rounded-2xl border-4 p-5 ${tone}`} aria-live="polite">
       {result.kind === "done" && (
-        <div className="mt-5 rounded-xl bg-green-600 p-4 text-center text-lg font-extrabold text-white">
-          ✓ CHECKED-IN at {shortTime(result.time)}
+        <div className="mb-4 rounded-xl bg-green-600 p-4 text-center text-xl font-black text-white shadow-md">
+          ✓ CHECKED-IN
         </div>
       )}
       {result.kind === "already" && (
-        <div className="mt-5 rounded-xl bg-amber-500 p-4 text-center text-lg font-extrabold text-white">
+        <div className="mb-4 rounded-xl bg-amber-500 p-4 text-center text-lg font-black text-white shadow-md">
           ALREADY CHECKED-IN at {shortTime(result.time)}
         </div>
       )}
-      <button onClick={onNext} className="btn-outline mt-3 w-full">{result.kind === "valid" ? "Cancel" : "Next guest"}</button>
+
+      <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-[15px]">
+        <dt className="text-slate-500">Name</dt><dd className="font-bold text-navy text-lg">{p.name}</dd>
+        <dt className="text-slate-500">Role</dt><dd className="font-medium text-navy">{p.participantType}</dd>
+        {p.firm && (<><dt className="text-slate-500">Firm</dt><dd className="text-navy">{p.firm}</dd></>)}
+        <dt className="text-slate-500">Persons</dt><dd className="text-2xl font-extrabold text-accent">Admit {p.persons}</dd>
+        <dt className="text-slate-500">Pass ID</dt><dd className="font-mono font-bold text-navy">{p.passId}</dd>
+      </dl>
+
+      {result.kind === "valid" && (
+        <button onClick={(e) => { e.stopPropagation(); onMark(p.passId); }} disabled={busy}
+          className="btn mt-5 h-14 w-full bg-green-600 text-lg font-extrabold text-white hover:bg-green-700">
+          {busy ? <span className="spinner" /> : "VALID – Mark Checked-in"}
+        </button>
+      )}
+
+      {result.kind !== "valid" && (
+        <p className="mt-4 text-center text-xs font-medium text-slate-500">Auto-clearing in 2s · Tap card to scan next</p>
+      )}
     </div>
   );
 }
@@ -287,11 +381,25 @@ function Scanner({ paused, onScan }: { paused: boolean; onScan: (text: string) =
       try {
         const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
         if (cancelled) return;
-        const s = new Html5Qrcode("qr-reader", { formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE], verbose: false }) as unknown as ScannerInstance;
+        const s = new Html5Qrcode("qr-reader", {
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+          verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetectorIfSupported: true,
+          },
+        }) as unknown as ScannerInstance;
         ref.current = s;
         await s.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: (w: number, h: number) => { const n = Math.floor(Math.min(w, h) * 0.7); return { width: n, height: n }; } },
+          {
+            fps: 25,
+            qrbox: (w: number, h: number) => {
+              const min = Math.min(w, h);
+              const n = Math.floor(min * 0.85);
+              return { width: n, height: n };
+            },
+            aspectRatio: 1.0,
+          },
           (text: string) => {
             if (pausedRef.current) return;
             pausedRef.current = true; // block repeats until result is cleared
