@@ -46,8 +46,6 @@ export default function RsvpForm() {
     setTouched((t) => ({ ...t, [k]: true }));
     setErrors(validateRegistration(f).errors);
   };
-  const toggle = (k: "interestedIn" | "landLocation", v: string) =>
-    set(k, f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v]);
 
   const err = (k: keyof FormState) => (touched[k] ? errors[k] : undefined);
 
@@ -199,40 +197,6 @@ export default function RsvpForm() {
           {errors.persons && <p className="field-error">{errors.persons}</p>}
         </div>
 
-        <div className="gold-rule" />
-        <p className="-mb-2 text-sm text-slate-500">Optional – helps us prepare for you</p>
-
-        {/* Interested In */}
-        <fieldset>
-          <legend className="field-label">Interested In <Opt /></legend>
-          <div className="flex flex-wrap gap-2">
-            {EVENT.interestOptions.map((t) => (
-              <button key={t} type="button" aria-pressed={f.interestedIn.includes(t)} onClick={() => toggle("interestedIn", t)} className="chip">
-                {f.interestedIn.includes(t) && <Tick />}{t}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* Land Location */}
-        <fieldset>
-          <legend className="field-label">Land Location <Opt /></legend>
-          <div className="flex flex-wrap gap-2">
-            {EVENT.locationOptions.map((t) => (
-              <button key={t} type="button" aria-pressed={f.landLocation.includes(t)} onClick={() => toggle("landLocation", t)} className="chip">
-                {f.landLocation.includes(t) && <Tick />}{t}
-              </button>
-            ))}
-          </div>
-        </fieldset>
-
-        {/* Land size */}
-        <div>
-          <label htmlFor="f-landSize" className="field-label">Approx. Land Size <Opt /></label>
-          <input id="f-landSize" className="field-input" type="text" placeholder="e.g. 2 acres / 10 grounds"
-            value={f.landSize} maxLength={60} onChange={(e) => set("landSize", e.target.value)} />
-        </div>
-
         {/* Consent */}
         <div>
           <label htmlFor="f-consent" className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${err("consent") ? "border-red-500" : "border-slate-200 bg-white/70"}`}>
@@ -266,8 +230,3 @@ export default function RsvpForm() {
 
 const Req = () => <span className="text-accent" aria-label="required">*</span>;
 const Opt = () => <span className="text-sm font-normal text-slate-400">(optional)</span>;
-const Tick = () => (
-  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
-    <path d="M7.7 13.3 4.4 10l-1.2 1.2 4.5 4.5 9.5-9.5-1.2-1.2z" />
-  </svg>
-);
