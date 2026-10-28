@@ -24,7 +24,7 @@ function playSuccessBeep() {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.22);
     osc.start(now);
     osc.stop(now + 0.22);
-  } catch {}
+  } catch { }
 }
 
 function playWarningBeep() {
@@ -44,7 +44,7 @@ function playWarningBeep() {
     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.26);
     osc.start(now);
     osc.stop(now + 0.26);
-  } catch {}
+  } catch { }
 }
 
 type Result =
@@ -58,17 +58,17 @@ export default function CheckinApp() {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    try { setPin(sessionStorage.getItem(PIN_KEY)); } catch {}
+    try { setPin(sessionStorage.getItem(PIN_KEY)); } catch { }
     setReady(true);
   }, []);
 
   const logout = useCallback(() => {
-    try { sessionStorage.removeItem(PIN_KEY); } catch {}
+    try { sessionStorage.removeItem(PIN_KEY); } catch { }
     setPin(null);
   }, []);
 
   if (!ready) return null;
-  if (!pin) return <PinGate onOk={(p) => { try { sessionStorage.setItem(PIN_KEY, p); } catch {} setPin(p); }} />;
+  if (!pin) return <PinGate onOk={(p) => { try { sessionStorage.setItem(PIN_KEY, p); } catch { } setPin(p); }} />;
   return <Desk pin={pin} onUnauthorized={logout} />;
 }
 
@@ -140,7 +140,7 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
   );
 
   const loadStats = useCallback(async () => {
-    try { setStats((await api("/api/checkin/stats")).stats); } catch {}
+    try { setStats((await api("/api/checkin/stats")).stats); } catch { }
   }, [api]);
 
   useEffect(() => {
@@ -312,7 +312,7 @@ function ResultCard({ result, busy, onMark, onNext }: { result: Result; busy: bo
   const p = result.pass;
   const tone =
     result.kind === "valid" ? "border-green-500 bg-white" :
-    result.kind === "done" ? "border-green-500 bg-green-50/90" : "border-amber-500 bg-amber-50";
+      result.kind === "done" ? "border-green-500 bg-green-50/90" : "border-amber-500 bg-amber-50";
 
   return (
     <div onClick={onNext} className={`fade-up mt-5 cursor-pointer rounded-2xl border-4 p-5 ${tone}`} aria-live="polite">
@@ -405,9 +405,9 @@ function Scanner({ paused, onScan }: { paused: boolean; onScan: (text: string) =
             pausedRef.current = true; // block repeats until result is cleared
             onScanRef.current(text);
           },
-          () => {}
+          () => { }
         );
-        if (cancelled) { await s.stop().catch(() => {}); return; }
+        if (cancelled) { await s.stop().catch(() => { }); return; }
       } catch (e) {
         const msg = String((e as Error)?.message || e);
         setErr(/permission|NotAllowed/i.test(msg)
@@ -420,7 +420,7 @@ function Scanner({ paused, onScan }: { paused: boolean; onScan: (text: string) =
     return () => {
       cancelled = true;
       const s = ref.current;
-      if (s?.isScanning) s.stop().then(() => s.clear()).catch(() => {});
+      if (s?.isScanning) s.stop().then(() => s.clear()).catch(() => { });
     };
   }, []);
 
