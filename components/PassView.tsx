@@ -54,9 +54,8 @@ export default function PassView({ pass }: { pass: Pass }) {
         <article className="overflow-hidden rounded-3xl border border-gold/70 bg-white shadow-ticket">
           <header className="relative bg-navy px-6 pb-6 pt-6 text-center text-white">
             <div className="flex justify-center">
-              <div className="rounded-xl bg-white px-3 py-2"><Logo /></div>
+              <div className="rounded-xl bg-white px-3 py-2"><Logo className="h-10 sm:h-12" /></div>
             </div>
-            <p className="mt-2 text-[10px] tracking-[0.35em] text-gold">{EVENT.orgTagline}</p>
             <div className="mx-auto my-4 h-px w-2/3 bg-gold/50" />
             <p className="text-[13px] font-bold tracking-[0.4em] text-accent">ENTRY PASS</p>
             <p className="mt-2 font-serif text-lg leading-snug">{EVENT.subtitle}</p>

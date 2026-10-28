@@ -423,6 +423,12 @@ function emailHtml_(p, passUrl) {
     return '<a href="' + esc_(href) + '" style="display:inline-block;background:' + bg + ';color:#FFFFFF;text-decoration:none;font:bold 15px Arial,sans-serif;padding:14px 22px;border-radius:10px;margin:6px 4px;">' + text + '</a>';
   };
 
+  // Header
+  var site = siteUrl_();
+  var logoHtml = site
+    ? '<div style="margin-bottom:8px;"><span style="display:inline-block;background:#ffffff;padding:6px 14px;border-radius:10px;"><img src="' + esc_(site) + '/dac-logo.png" alt="DAC Developers" height="40" style="height:40px;width:auto;display:block;" /></span></div>'
+    : '<div style="font:bold 30px Georgia,serif;color:#FFFFFF;letter-spacing:6px;">DAC</div>';
+
   return '' +
   '<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><meta charset="utf-8"></head>' +
   '<body style="margin:0;padding:0;background:#F3EFE9;">' +
@@ -432,8 +438,7 @@ function emailHtml_(p, passUrl) {
 
   // Header
   '<tr><td style="background:#0E1B3D;padding:26px 24px 22px;text-align:center;">' +
-    '<div style="font:bold 30px Georgia,serif;color:#FFFFFF;letter-spacing:6px;">DAC</div>' +
-    '<div style="font:11px Arial,sans-serif;color:#D4A94F;letter-spacing:3px;margin-top:4px;">' + EVENT.orgTagline + '</div>' +
+    logoHtml +
     '<div style="height:1px;background:#D4A94F;opacity:.5;margin:18px auto;width:60%;"></div>' +
     '<div style="font:bold 13px Arial,sans-serif;color:#E8641E;letter-spacing:4px;">ENTRY PASS</div>' +
     '<div style="font:20px Georgia,serif;color:#FFFFFF;margin-top:8px;line-height:1.35;">' + EVENT.subtitle + '</div>' +

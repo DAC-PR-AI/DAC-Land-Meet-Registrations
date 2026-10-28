@@ -6,8 +6,7 @@ export default function Hero() {
   return (
     <header className="px-5 pb-6 pt-8 text-center sm:pt-12">
       <div className="fade-up flex flex-col items-center">
-        <Logo />
-        <p className="mt-2 text-[11px] font-medium tracking-[0.35em] text-royal/80">{EVENT.orgTagline}</p>
+        <Logo className="h-14 sm:h-16" />
       </div>
 
       <p className="fade-up delay-1 mt-7 text-xs font-semibold uppercase tracking-[0.25em] text-accent">You are invited</p>

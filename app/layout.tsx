@@ -23,7 +23,14 @@ export const metadata: Metadata = {
     images: [{ url: "/og.jpg", width: 1200, height: 630, alt: "DAC Developers – Exclusive Invitation" }],
   },
   twitter: { card: "summary_large_image", title: "Exclusive Invitation – DAC Developers", description, images: ["/og.jpg"] },
-  icons: { icon: "/favicon.svg" },
+  icons: {
+    icon: [
+      { url: "/favicon.ico" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/favicon.png", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png" }],
+  },
 };
 
 export const viewport: Viewport = {

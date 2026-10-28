@@ -21,8 +21,15 @@ export default function Logo({ variant = "dark", className = "" }: { variant?: "
       </div>
     );
   }
+  const hasHeight = /\bh-/.test(className);
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img ref={ref} src="/dac-logo.png" alt="DAC Developers" className={`h-12 w-auto object-contain ${className}`} onError={() => setFailed(true)} />
+    <img
+      ref={ref}
+      src="/dac-logo.png"
+      alt="DAC Developers"
+      className={`${hasHeight ? "" : "h-12"} w-auto object-contain ${className}`.trim()}
+      onError={() => setFailed(true)}
+    />
   );
 }
