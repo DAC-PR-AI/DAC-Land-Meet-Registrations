@@ -122,7 +122,7 @@ export default function RsvpForm() {
       <input ref={honeypot} type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
         className="absolute left-[-9999px] h-0 w-0 opacity-0" />
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-5">
         {/* I am a */}
         <fieldset>
           <legend className="field-label">I am a <Req /></legend>
@@ -152,7 +152,7 @@ export default function RsvpForm() {
         <div>
           <label htmlFor="f-mobile" className="field-label">Mobile Number <Req /></label>
           <div className="flex">
-            <span className="flex h-14 items-center rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 px-4 text-[17px] font-medium text-slate-600">
+            <span className="flex h-[52px] sm:h-14 items-center rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 px-3.5 sm:px-4 text-[16px] font-medium text-slate-600">
               +91
             </span>
             <input id="f-mobile" className="field-input rounded-l-none" type="tel" inputMode="numeric" autoComplete="tel-national"
@@ -161,7 +161,7 @@ export default function RsvpForm() {
               aria-invalid={!!err("mobile")} aria-describedby={err("mobile") ? "e-mobile" : "h-mobile"} />
           </div>
           {err("mobile") ? <p id="e-mobile" className="field-error">{err("mobile")}</p>
-            : <p id="h-mobile" className="mt-1.5 text-sm text-slate-500">Your pass will be linked to this number.</p>}
+            : <p id="h-mobile" className="mt-1 text-xs sm:text-sm text-slate-500">Your pass will be linked to this number.</p>}
         </div>
 
         {/* Email */}
@@ -172,7 +172,7 @@ export default function RsvpForm() {
             onChange={(e) => set("email", e.target.value.trim())} onBlur={() => blur("email")}
             aria-invalid={!!err("email")} aria-describedby={err("email") ? "e-email" : "h-email"} />
           {err("email") ? <p id="e-email" className="field-error">{err("email")}</p>
-            : <p id="h-email" className="mt-1.5 text-sm text-slate-500">We will email your Entry Pass here.</p>}
+            : <p id="h-email" className="mt-1 text-xs sm:text-sm text-slate-500">We will email your Entry Pass here.</p>}
         </div>
 
         {/* Firm */}
@@ -187,23 +187,23 @@ export default function RsvpForm() {
         <div>
           <span className="field-label" id="l-persons">No. of Persons <Req /></span>
           <div id="f-persons" tabIndex={-1} className="flex items-center gap-3 outline-none" role="group" aria-labelledby="l-persons">
-            <button type="button" className="btn-outline h-14 w-14 text-2xl" aria-label="Decrease"
+            <button type="button" className="btn-outline h-12 w-12 text-xl" aria-label="Decrease"
               disabled={f.persons <= 1} onClick={() => set("persons", Math.max(1, f.persons - 1))}>−</button>
-            <output aria-live="polite" className="w-16 text-center text-2xl font-bold text-navy">{f.persons}</output>
-            <button type="button" className="btn-outline h-14 w-14 text-2xl" aria-label="Increase"
+            <output aria-live="polite" className="w-12 text-center text-xl font-bold text-navy">{f.persons}</output>
+            <button type="button" className="btn-outline h-12 w-12 text-xl" aria-label="Increase"
               disabled={f.persons >= EVENT.maxPersons} onClick={() => set("persons", Math.min(EVENT.maxPersons, f.persons + 1))}>+</button>
-            <span className="text-sm text-slate-500">Including you (max {EVENT.maxPersons})</span>
+            <span className="text-xs sm:text-sm text-slate-500">Including you (max {EVENT.maxPersons})</span>
           </div>
           {errors.persons && <p className="field-error">{errors.persons}</p>}
         </div>
 
         {/* Consent */}
-        <div>
-          <label htmlFor="f-consent" className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${err("consent") ? "border-red-500" : "border-slate-200 bg-white/70"}`}>
+        <div className="pt-1">
+          <label htmlFor="f-consent" className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 sm:p-4 ${err("consent") ? "border-red-500 bg-red-50/50" : "border-slate-200 bg-white/70"}`}>
             <input id="f-consent" type="checkbox" checked={f.consent}
               onChange={(e) => { set("consent", e.target.checked); setTouched((x) => ({ ...x, consent: true })); }}
-              className="mt-0.5 h-6 w-6 shrink-0 accent-royal" aria-invalid={!!err("consent")} />
-            <span className="text-[15px] leading-snug text-navy">
+              className="mt-0.5 h-5 w-5 shrink-0 accent-royal" aria-invalid={!!err("consent")} />
+            <span className="text-[14px] sm:text-[15px] leading-snug text-navy">
               I agree to receive event updates from DAC Developers on WhatsApp &amp; Email <Req />
             </span>
           </label>
@@ -211,18 +211,18 @@ export default function RsvpForm() {
         </div>
 
         {serverError && (
-          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-[15px] text-red-700">
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-[14px] sm:text-[15px] text-red-700">
             {serverError}{" "}
             <a href={`tel:${EVENT.phoneTel}`} className="font-semibold underline">Call {EVENT.phoneShort}</a>
           </div>
         )}
-      </div>
 
-      {/* Sticky on mobile, inline on desktop */}
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gold/40 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0">
-        <button type="submit" disabled={submitting} className="btn-primary h-14 w-full text-[17px]">
-          {submitting ? (<><span className="spinner" aria-hidden="true" /> Please wait…</>) : "Get My Entry Pass"}
-        </button>
+        {/* Clean inline submit button - no sticky overlay */}
+        <div className="pt-2 sm:pt-3">
+          <button type="submit" disabled={submitting} className="btn-primary h-[52px] sm:h-14 w-full text-[16px] sm:text-[17px] font-semibold shadow-md">
+            {submitting ? (<><span className="spinner" aria-hidden="true" /> Please wait…</>) : "Get My Entry Pass"}
+          </button>
+        </div>
       </div>
     </form>
   );

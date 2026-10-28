@@ -9,7 +9,7 @@ export class ScriptError extends Error {
   }
 }
 
-type ScriptResponse = { ok: boolean; error?: string; code?: string; [k: string]: unknown };
+type ScriptResponse = { ok: boolean; error?: string; code?: string;[k: string]: unknown };
 
 /**
  * Calls the Google Apps Script Web App.

@@ -24,9 +24,9 @@ input, select, textarea, button { font-size: 16px; }
     @apply h-px w-full;
     background: linear-gradient(90deg, transparent, #D4A94F 20%, #D4A94F 80%, transparent);
   }
-  .field-label { @apply mb-2 block text-[15px] font-semibold text-navy; }
+  .field-label { @apply mb-1.5 block text-[14px] sm:text-[15px] font-semibold text-navy; }
   .field-input {
-    @apply block h-14 w-full rounded-xl border border-slate-300 bg-white px-4 text-[17px] text-navy
+    @apply block h-[52px] sm:h-14 w-full rounded-xl border border-slate-300 bg-white px-3.5 sm:px-4 text-[16px] text-navy
       placeholder:text-slate-400 outline-none transition
       focus:border-royal focus:ring-4 focus:ring-royal/15;
   }

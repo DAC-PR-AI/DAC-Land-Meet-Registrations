@@ -2,7 +2,7 @@ import { EVENT } from "@/lib/event";
 
 export default function Footer({ stickyPad = false }: { stickyPad?: boolean }) {
   return (
-    <footer className={`mt-10 bg-navy px-5 pt-8 text-center text-sm text-white/80 sm:pb-8 ${stickyPad ? "pb-28" : "pb-8"}`}>
+    <footer className={`mt-6 bg-navy px-5 pt-8 text-center text-sm text-white/80 pb-10 ${stickyPad ? "pb-28" : "pb-10"}`}>
       <p className="font-serif text-lg text-white">{EVENT.organiserShort}</p>
       <p className="mt-1 text-[11px] tracking-[0.3em] text-gold">{EVENT.orgTagline}</p>
       <div className="mx-auto my-4 h-px w-24 bg-gold/50" />

@@ -13,11 +13,11 @@ export default function Home() {
     <>
       <main className="mx-auto max-w-3xl">
         <Hero />
-        <section className="px-4" aria-label="Registration">
+        <section className="px-3.5 sm:px-4 pb-12 sm:pb-16" aria-label="Registration">
           {closed ? <ClosedScreen /> : <RsvpForm />}
         </section>
       </main>
-      <Footer stickyPad={!closed} />
+      <Footer />
     </>
   );
 }
