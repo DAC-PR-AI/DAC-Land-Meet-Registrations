@@ -1,0 +1,4 @@
+User-agent: *
+Disallow: /pass/
+Disallow: /checkin
+Disallow: /api/

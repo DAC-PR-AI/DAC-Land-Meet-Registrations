@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { color-scheme: light; }
+
+html { -webkit-text-size-adjust: 100%; }
+body {
+  @apply bg-cream text-navy font-sans antialiased;
+  background-image:
+    radial-gradient(120% 60% at 50% -10%, rgba(232, 100, 30, 0.22) 0%, rgba(212, 169, 79, 0.12) 35%, rgba(250, 248, 245, 0) 70%);
+  background-repeat: no-repeat;
+  min-height: 100dvh;
+}
+
+/* iOS: inputs ≥16px so the page never zooms */
+input, select, textarea, button { font-size: 16px; }
+
+@layer components {
+  .glass {
+    @apply rounded-2xl border border-white/70 bg-white/80 shadow-soft backdrop-blur-md;
+  }
+  .gold-rule {
+    @apply h-px w-full;
+    background: linear-gradient(90deg, transparent, #D4A94F 20%, #D4A94F 80%, transparent);
+  }
+  .field-label { @apply mb-2 block text-[15px] font-semibold text-navy; }
+  .field-input {
+    @apply block h-14 w-full rounded-xl border border-slate-300 bg-white px-4 text-[17px] text-navy
+      placeholder:text-slate-400 outline-none transition
+      focus:border-royal focus:ring-4 focus:ring-royal/15;
+  }
+  .field-input[aria-invalid="true"] { @apply border-red-500 focus:ring-red-500/15; }
+  .field-error { @apply mt-1.5 text-sm font-medium text-red-600; }
+  .chip {
+    @apply inline-flex min-h-[48px] items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white
+      px-4 text-[15px] font-medium text-navy transition select-none
+      active:scale-[0.98];
+  }
+  .chip[aria-pressed="true"], .chip[aria-checked="true"] {
+    @apply border-royal bg-royal text-white shadow-md;
+  }
+  .btn {
+    @apply inline-flex min-h-[52px] items-center justify-center gap-2 rounded-xl px-5 text-[16px] font-semibold
+      transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60;
+  }
+  .btn-primary { @apply btn bg-accent text-white shadow-lg shadow-accent/30 hover:bg-accent-dark; }
+  .btn-navy { @apply btn bg-navy text-white hover:bg-royal; }
+  .btn-outline { @apply btn border border-navy/20 bg-white text-navy hover:border-royal; }
+  .btn-wa { @apply btn bg-[#1FA855] text-white hover:bg-[#178a45]; }
+}
+
+/* Subtle CSS-only animations */
+@keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.fade-up { animation: fadeUp .6s ease-out both; }
+.delay-1 { animation-delay: .08s; } .delay-2 { animation-delay: .16s; } .delay-3 { animation-delay: .24s; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { width: 20px; height: 20px; border-radius: 9999px; border: 3px solid rgba(255,255,255,.35); border-top-color: #fff; animation: spin .8s linear infinite; }
+
+@keyframes drawCircle { to { stroke-dashoffset: 0; } }
+@keyframes drawCheck { to { stroke-dashoffset: 0; } }
+@keyframes pop { 0% { transform: scale(.6); opacity: 0 } 60% { transform: scale(1.05); opacity: 1 } 100% { transform: scale(1) } }
+.check-wrap { animation: pop .45s ease-out both; }
+.check-circle { stroke-dasharray: 166; stroke-dashoffset: 166; animation: drawCircle .6s ease-out .1s forwards; }
+.check-tick { stroke-dasharray: 48; stroke-dashoffset: 48; animation: drawCheck .35s ease-out .6s forwards; }
+
+@keyframes shimmer { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+.skeleton { background: linear-gradient(90deg, #eee 25%, #f6f6f6 50%, #eee 75%); background-size: 200% 100%; animation: shimmer 1.4s infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; animation-delay: 0ms !important; transition-duration: .01ms !important; }
+  .check-circle, .check-tick { stroke-dashoffset: 0; }
+}

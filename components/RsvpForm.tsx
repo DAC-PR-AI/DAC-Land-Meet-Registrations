@@ -1,0 +1,273 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import { FormEvent, useRef, useState } from "react";
+import { EVENT, FRIENDLY_ERROR, isRegistrationClosed } from "@/lib/event";
+import { passPath } from "@/lib/links";
+import { FieldErrors, RegistrationInput, validateRegistration } from "@/lib/validate";
+import ClosedScreen from "./ClosedScreen";
+import SuccessCheck from "./SuccessCheck";
+
+type FormState = Omit<RegistrationInput, "persons"> & { persons: number };
+
+const INITIAL: FormState = {
+  participantType: "",
+  name: "",
+  mobile: "",
+  email: "",
+  firm: "",
+  persons: 1,
+  interestedIn: [],
+  landLocation: [],
+  landSize: "",
+  consent: false,
+};
+
+const ORDER: (keyof FormState)[] = ["participantType", "name", "mobile", "email", "persons", "consent"];
+
+export default function RsvpForm() {
+  const router = useRouter();
+  const [f, setF] = useState<FormState>(INITIAL);
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Partial<Record<keyof FormState, boolean>>>({});
+  const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState<null | "new" | "duplicate">(null);
+  const [serverError, setServerError] = useState("");
+  const [closed, setClosed] = useState(false);
+  const inFlight = useRef(false);
+  const honeypot = useRef<HTMLInputElement>(null);
+
+  const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
+    const next = { ...f, [k]: v };
+    setF(next);
+    if (touched[k] || errors[k]) setErrors(validateRegistration(next).errors);
+  };
+  const blur = (k: keyof FormState) => {
+    setTouched((t) => ({ ...t, [k]: true }));
+    setErrors(validateRegistration(f).errors);
+  };
+  const toggle = (k: "interestedIn" | "landLocation", v: string) =>
+    set(k, f[k].includes(v) ? f[k].filter((x) => x !== v) : [...f[k], v]);
+
+  const err = (k: keyof FormState) => (touched[k] ? errors[k] : undefined);
+
+  async function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (inFlight.current) return; // prevent double submit
+    setServerError("");
+
+    if (isRegistrationClosed()) return setClosed(true);
+
+    const { errors: errs } = validateRegistration(f);
+    setErrors(errs);
+    setTouched(Object.fromEntries(ORDER.map((k) => [k, true])));
+    const first = ORDER.find((k) => errs[k]);
+    if (first) {
+      const el = document.getElementById(`f-${first}`);
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      (el as HTMLElement | null)?.focus?.({ preventScroll: true });
+      return;
+    }
+
+    inFlight.current = true;
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...f, website: honeypot.current?.value || "" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (data?.closed) return setClosed(true);
+      if (!res.ok || !data?.ok) {
+        if (data?.errors) setErrors(data.errors);
+        throw new Error(data?.error || FRIENDLY_ERROR);
+      }
+      const dest = passPath(data.passId, data.key);
+      router.prefetch(dest);
+      setDone(data.duplicate ? "duplicate" : "new");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(() => router.push(dest), data.duplicate ? 2200 : 1500);
+    } catch (e) {
+      setServerError((e as Error).message || FRIENDLY_ERROR);
+      inFlight.current = false;
+      setSubmitting(false);
+    }
+  }
+
+  if (closed) return <ClosedScreen />;
+
+  if (done) {
+    return (
+      <div className="glass fade-up mx-auto max-w-md p-8 text-center" role="status" aria-live="polite">
+        <SuccessCheck />
+        <h2 className="mt-5 font-serif text-2xl font-bold text-navy">
+          {done === "duplicate" ? "You're already registered!" : "You're registered!"}
+        </h2>
+        <p className="mt-2 text-slate-600">
+          {done === "duplicate" ? "Taking you to your existing Entry Pass…" : "Preparing your Entry Pass…"}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="glass fade-up mx-auto max-w-xl p-5 sm:p-8">
+      <h2 className="text-center font-serif text-2xl font-bold text-navy">Register for your Entry Pass</h2>
+      <p className="mx-auto mt-2 max-w-md text-center text-[15px] leading-relaxed text-slate-600">
+        Fill in your details to receive your Entry Pass instantly.{" "}
+        <span className="font-semibold text-navy">Only pass holders will be allowed entry.</span>
+      </p>
+      <div className="gold-rule my-6" />
+
+      {/* Honeypot (hidden from people) */}
+      <input ref={honeypot} type="text" name="website" tabIndex={-1} autoComplete="off" aria-hidden="true"
+        className="absolute left-[-9999px] h-0 w-0 opacity-0" />
+
+      <div className="space-y-6">
+        {/* I am a */}
+        <fieldset>
+          <legend className="field-label">I am a <Req /></legend>
+          <div id="f-participantType" role="radiogroup" aria-label="I am a" tabIndex={-1} className="grid grid-cols-1 gap-2 outline-none sm:grid-cols-3">
+            {EVENT.participantTypes.map((t) => (
+              <button key={t} type="button" role="radio" aria-checked={f.participantType === t}
+                onClick={() => { set("participantType", t); setTouched((x) => ({ ...x, participantType: true })); }}
+                className="chip w-full">
+                {t}
+              </button>
+            ))}
+          </div>
+          {err("participantType") && <p className="field-error">{err("participantType")}</p>}
+        </fieldset>
+
+        {/* Name */}
+        <div>
+          <label htmlFor="f-name" className="field-label">Full Name <Req /></label>
+          <input id="f-name" className="field-input" type="text" autoComplete="name" autoCapitalize="words"
+            placeholder="Your full name" value={f.name} maxLength={80}
+            onChange={(e) => set("name", e.target.value)} onBlur={() => blur("name")}
+            aria-invalid={!!err("name")} aria-describedby={err("name") ? "e-name" : undefined} />
+          {err("name") && <p id="e-name" className="field-error">{err("name")}</p>}
+        </div>
+
+        {/* Mobile */}
+        <div>
+          <label htmlFor="f-mobile" className="field-label">Mobile Number <Req /></label>
+          <div className="flex">
+            <span className="flex h-14 items-center rounded-l-xl border border-r-0 border-slate-300 bg-slate-50 px-4 text-[17px] font-medium text-slate-600">
+              +91
+            </span>
+            <input id="f-mobile" className="field-input rounded-l-none" type="tel" inputMode="numeric" autoComplete="tel-national"
+              placeholder="10-digit mobile number" value={f.mobile} maxLength={10}
+              onChange={(e) => set("mobile", e.target.value.replace(/\D/g, "").slice(0, 10))} onBlur={() => blur("mobile")}
+              aria-invalid={!!err("mobile")} aria-describedby={err("mobile") ? "e-mobile" : "h-mobile"} />
+          </div>
+          {err("mobile") ? <p id="e-mobile" className="field-error">{err("mobile")}</p>
+            : <p id="h-mobile" className="mt-1.5 text-sm text-slate-500">Your pass will be linked to this number.</p>}
+        </div>
+
+        {/* Email */}
+        <div>
+          <label htmlFor="f-email" className="field-label">Email ID <Req /></label>
+          <input id="f-email" className="field-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="none" spellCheck={false}
+            placeholder="name@example.com" value={f.email} maxLength={120}
+            onChange={(e) => set("email", e.target.value.trim())} onBlur={() => blur("email")}
+            aria-invalid={!!err("email")} aria-describedby={err("email") ? "e-email" : "h-email"} />
+          {err("email") ? <p id="e-email" className="field-error">{err("email")}</p>
+            : <p id="h-email" className="mt-1.5 text-sm text-slate-500">We will email your Entry Pass here.</p>}
+        </div>
+
+        {/* Firm */}
+        <div>
+          <label htmlFor="f-firm" className="field-label">Firm / Company Name <Opt /></label>
+          <input id="f-firm" className="field-input" type="text" autoComplete="organization"
+            placeholder="Leave blank if individual" value={f.firm} maxLength={100}
+            onChange={(e) => set("firm", e.target.value)} />
+        </div>
+
+        {/* Persons */}
+        <div>
+          <span className="field-label" id="l-persons">No. of Persons <Req /></span>
+          <div id="f-persons" tabIndex={-1} className="flex items-center gap-3 outline-none" role="group" aria-labelledby="l-persons">
+            <button type="button" className="btn-outline h-14 w-14 text-2xl" aria-label="Decrease"
+              disabled={f.persons <= 1} onClick={() => set("persons", Math.max(1, f.persons - 1))}>−</button>
+            <output aria-live="polite" className="w-16 text-center text-2xl font-bold text-navy">{f.persons}</output>
+            <button type="button" className="btn-outline h-14 w-14 text-2xl" aria-label="Increase"
+              disabled={f.persons >= EVENT.maxPersons} onClick={() => set("persons", Math.min(EVENT.maxPersons, f.persons + 1))}>+</button>
+            <span className="text-sm text-slate-500">Including you (max {EVENT.maxPersons})</span>
+          </div>
+          {errors.persons && <p className="field-error">{errors.persons}</p>}
+        </div>
+
+        <div className="gold-rule" />
+        <p className="-mb-2 text-sm text-slate-500">Optional – helps us prepare for you</p>
+
+        {/* Interested In */}
+        <fieldset>
+          <legend className="field-label">Interested In <Opt /></legend>
+          <div className="flex flex-wrap gap-2">
+            {EVENT.interestOptions.map((t) => (
+              <button key={t} type="button" aria-pressed={f.interestedIn.includes(t)} onClick={() => toggle("interestedIn", t)} className="chip">
+                {f.interestedIn.includes(t) && <Tick />}{t}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        {/* Land Location */}
+        <fieldset>
+          <legend className="field-label">Land Location <Opt /></legend>
+          <div className="flex flex-wrap gap-2">
+            {EVENT.locationOptions.map((t) => (
+              <button key={t} type="button" aria-pressed={f.landLocation.includes(t)} onClick={() => toggle("landLocation", t)} className="chip">
+                {f.landLocation.includes(t) && <Tick />}{t}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+
+        {/* Land size */}
+        <div>
+          <label htmlFor="f-landSize" className="field-label">Approx. Land Size <Opt /></label>
+          <input id="f-landSize" className="field-input" type="text" placeholder="e.g. 2 acres / 10 grounds"
+            value={f.landSize} maxLength={60} onChange={(e) => set("landSize", e.target.value)} />
+        </div>
+
+        {/* Consent */}
+        <div>
+          <label htmlFor="f-consent" className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 ${err("consent") ? "border-red-500" : "border-slate-200 bg-white/70"}`}>
+            <input id="f-consent" type="checkbox" checked={f.consent}
+              onChange={(e) => { set("consent", e.target.checked); setTouched((x) => ({ ...x, consent: true })); }}
+              className="mt-0.5 h-6 w-6 shrink-0 accent-royal" aria-invalid={!!err("consent")} />
+            <span className="text-[15px] leading-snug text-navy">
+              I agree to receive event updates from DAC Developers on WhatsApp &amp; Email <Req />
+            </span>
+          </label>
+          {err("consent") && <p className="field-error">{err("consent")}</p>}
+        </div>
+
+        {serverError && (
+          <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-4 text-[15px] text-red-700">
+            {serverError}{" "}
+            <a href={`tel:${EVENT.phoneTel}`} className="font-semibold underline">Call {EVENT.phoneShort}</a>
+          </div>
+        )}
+      </div>
+
+      {/* Sticky on mobile, inline on desktop */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-gold/40 bg-white/95 px-4 pb-[max(12px,env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:static sm:mt-8 sm:border-0 sm:bg-transparent sm:p-0">
+        <button type="submit" disabled={submitting} className="btn-primary h-14 w-full text-[17px]">
+          {submitting ? (<><span className="spinner" aria-hidden="true" /> Please wait…</>) : "Get My Entry Pass"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+const Req = () => <span className="text-accent" aria-label="required">*</span>;
+const Opt = () => <span className="text-sm font-normal text-slate-400">(optional)</span>;
+const Tick = () => (
+  <svg viewBox="0 0 20 20" className="h-4 w-4" fill="currentColor" aria-hidden="true">
+    <path d="M7.7 13.3 4.4 10l-1.2 1.2 4.5 4.5 9.5-9.5-1.2-1.2z" />
+  </svg>
+);
