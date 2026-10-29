@@ -117,7 +117,7 @@ function PinGate({ onOk }: { onOk: (pin: string) => void }) {
 /* ---------------- Main desk ---------------- */
 
 function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void }) {
-  const [mode, setMode] = useState<"scan" | "search">("scan");
+  const [mode, setMode] = useState<"scan" | "mobile" | "pass">("scan");
   const [stats, setStats] = useState<Stats | null>(null);
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -281,34 +281,66 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
         <StatBox label="Checked-in" value={stats?.checkedIn} sub={stats ? `${stats.checkedInPersons} persons` : undefined} accent />
       </div>
 
-      {/* Mode tabs */}
-      <div className="mt-5 grid grid-cols-2 gap-1 rounded-xl bg-navy/5 p-1" role="tablist">
-        {(["scan", "search"] as const).map((m) => (
-          <button key={m} role="tab" aria-selected={mode === m} onClick={() => { setMode(m); reset(); }}
-            className={`h-12 rounded-lg text-[15px] font-semibold transition ${mode === m ? "bg-white text-navy shadow" : "text-slate-500"}`}>
-            {m === "scan" ? "⚡ QR Scanner" : "📱 Mobile Search"}
+      {/* Mode tabs: 3 dedicated workflows */}
+      <div className="mt-5 grid grid-cols-3 gap-1 rounded-xl bg-navy/5 p-1" role="tablist">
+        {(
+          [
+            { id: "scan", label: "⚡ QR Scan" },
+            { id: "mobile", label: "📱 Mobile" },
+            { id: "pass", label: "🎫 Pass ID" },
+          ] as const
+        ).map((t) => (
+          <button
+            key={t.id}
+            role="tab"
+            aria-selected={mode === t.id}
+            onClick={() => {
+              setMode(t.id);
+              reset();
+            }}
+            className={`h-12 rounded-lg text-xs sm:text-[14px] font-bold transition flex items-center justify-center gap-1 ${
+              mode === t.id ? "bg-white text-navy shadow" : "text-slate-500 hover:text-navy"
+            }`}
+          >
+            {t.label}
           </button>
         ))}
       </div>
 
       <div className="mt-4">
-        {mode === "scan" ? (
+        {mode === "scan" && (
           <div>
             <Scanner paused={!!result || busy} onScan={fastScanCheckin} />
-            <button
-              onClick={() => { setMode("search"); reset(); }}
-              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-royal/20 bg-royal/5 py-3 text-center text-sm font-bold text-royal transition hover:bg-royal/10 active:scale-98"
-            >
-              📱 Guest has no QR pass? Search by Mobile Number
-            </button>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <button
+                onClick={() => {
+                  setMode("mobile");
+                  reset();
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-royal/20 bg-royal/5 py-3 text-xs font-bold text-royal transition hover:bg-royal/10 active:scale-98"
+              >
+                📱 Search by Mobile
+              </button>
+              <button
+                onClick={() => {
+                  setMode("pass");
+                  reset();
+                }}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-royal/20 bg-royal/5 py-3 text-xs font-bold text-royal transition hover:bg-royal/10 active:scale-98"
+              >
+                🎫 Search by Pass ID
+              </button>
+            </div>
           </div>
-        ) : (
+        )}
+
+        {mode === "mobile" && (
           <div className="rounded-2xl border border-gold/40 bg-white p-5 shadow-sm">
             <div className="flex items-center gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold/20 text-base">📱</span>
               <div>
                 <p className="text-base font-bold text-navy">Search by Mobile Number</p>
-                <p className="text-xs text-slate-500">For guests who didn't receive or bring a QR pass.</p>
+                <p className="text-xs text-slate-500">For guests who only registered with their mobile phone.</p>
               </div>
             </div>
 
@@ -319,16 +351,18 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
               }}
               className="mt-4"
             >
-              <div className="relative flex items-center">
+              <label className="text-xs font-semibold text-slate-600">Enter 10-Digit Mobile Number</label>
+              <div className="relative mt-1 flex items-center">
                 <span className="absolute left-3 text-sm font-bold text-slate-400 select-none">+91</span>
                 <input
                   value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder="Enter 10-digit mobile no."
+                  onChange={(e) => setQuery(e.target.value.replace(/[^\d\s+-]/g, ""))}
+                  placeholder="98401 23456"
                   className="field-input pl-12 text-lg font-mono font-bold tracking-wider"
                   inputMode="tel"
                   autoFocus
-                  aria-label="Mobile number or Pass ID"
+                  maxLength={14}
+                  aria-label="10-digit Mobile Number"
                 />
                 {query && (
                   <button
@@ -343,16 +377,88 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
 
               <button
                 type="submit"
-                className="btn-navy mt-3 flex h-12 w-full items-center justify-center gap-2 text-base font-bold shadow-md"
+                className="btn-navy mt-4 flex h-12 w-full items-center justify-center gap-2 text-base font-bold shadow-md"
                 disabled={busy || !query.trim()}
               >
-                {busy ? <span className="spinner" /> : "🔍 Find Guest Details"}
+                {busy ? <span className="spinner" /> : "🔍 Find by Mobile Number"}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {mode === "pass" && (
+          <div className="rounded-2xl border border-gold/40 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-50 text-base">🎫</span>
+              <div>
+                <p className="text-base font-bold text-navy">Search by Pass ID</p>
+                <p className="text-xs text-slate-500">Enter pass number (e.g. 42 or DAC-LE-0042).</p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                lookup(extractPassId(query));
+              }}
+              className="mt-4"
+            >
+              <label className="text-xs font-semibold text-slate-600">Pass Number or Full Pass ID</label>
+              <div className="relative mt-1 flex items-center">
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="e.g. 42 or DAC-LE-0042"
+                  className="field-input text-lg font-mono font-bold uppercase tracking-wider"
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  autoFocus
+                  aria-label="Pass ID"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute right-3 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600 hover:bg-slate-300"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="btn-navy mt-4 flex h-12 w-full items-center justify-center gap-2 text-base font-bold shadow-md"
+                disabled={busy || !query.trim()}
+              >
+                {busy ? <span className="spinner" /> : "🔍 Find by Pass ID"}
               </button>
             </form>
 
-            <p className="mt-3 text-center text-xs text-slate-400">
-              Also accepts Pass ID (e.g. <span className="font-mono">DAC-LE-0012</span> or <span className="font-mono">12</span>)
-            </p>
+            <div className="mt-3 flex items-center justify-center gap-2 text-xs text-slate-400">
+              <span>Quick tests:</span>
+              <button
+                type="button"
+                onClick={() => setQuery("1")}
+                className="rounded bg-slate-100 px-2 py-1 font-mono font-semibold text-slate-600 hover:bg-slate-200"
+              >
+                1
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuery("12")}
+                className="rounded bg-slate-100 px-2 py-1 font-mono font-semibold text-slate-600 hover:bg-slate-200"
+              >
+                12
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuery("DAC-LE-0001")}
+                className="rounded bg-slate-100 px-2 py-1 font-mono font-semibold text-slate-600 hover:bg-slate-200"
+              >
+                DAC-LE-0001
+              </button>
+            </div>
           </div>
         )}
       </div>
