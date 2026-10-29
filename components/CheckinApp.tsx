@@ -153,9 +153,9 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
   // Gate session cache: stores verified/checked-in passes in memory for 0ms duplicate detection
   const sessionCache = useRef<Map<string, { pass: Pass; time: string }>>(new Map());
 
-  // Auto-reset back to camera scanning for next guest
+  // Auto-reset back to camera scanning for next guest (only for completed scans or not found, NEVER for valid pending confirmation)
   useEffect(() => {
-    if (!result) return;
+    if (!result || result.kind === "valid") return;
     const delay = result.kind === "done" ? 1800 : result.kind === "already" ? 2600 : 2200;
     const timer = setTimeout(() => {
       setResult(null);
@@ -286,20 +286,74 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
         {(["scan", "search"] as const).map((m) => (
           <button key={m} role="tab" aria-selected={mode === m} onClick={() => { setMode(m); reset(); }}
             className={`h-12 rounded-lg text-[15px] font-semibold transition ${mode === m ? "bg-white text-navy shadow" : "text-slate-500"}`}>
-            {m === "scan" ? "⚡ Fast Scanner" : "Search"}
+            {m === "scan" ? "⚡ QR Scanner" : "📱 Mobile Search"}
           </button>
         ))}
       </div>
 
       <div className="mt-4">
         {mode === "scan" ? (
-          <Scanner paused={!!result || busy} onScan={fastScanCheckin} />
+          <div>
+            <Scanner paused={!!result || busy} onScan={fastScanCheckin} />
+            <button
+              onClick={() => { setMode("search"); reset(); }}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl border border-royal/20 bg-royal/5 py-3 text-center text-sm font-bold text-royal transition hover:bg-royal/10 active:scale-98"
+            >
+              📱 Guest has no QR pass? Search by Mobile Number
+            </button>
+          </div>
         ) : (
-          <form onSubmit={(e) => { e.preventDefault(); lookup(query); }} className="flex gap-2">
-            <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Mobile no. or Pass ID (e.g. 12)"
-              className="field-input" inputMode="text" autoCapitalize="characters" aria-label="Mobile number or Pass ID" />
-            <button className="btn-navy shrink-0 px-5" disabled={busy || !query.trim()}>Find</button>
-          </form>
+          <div className="rounded-2xl border border-gold/40 bg-white p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold/20 text-base">📱</span>
+              <div>
+                <p className="text-base font-bold text-navy">Search by Mobile Number</p>
+                <p className="text-xs text-slate-500">For guests who didn't receive or bring a QR pass.</p>
+              </div>
+            </div>
+
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                lookup(query);
+              }}
+              className="mt-4"
+            >
+              <div className="relative flex items-center">
+                <span className="absolute left-3 text-sm font-bold text-slate-400 select-none">+91</span>
+                <input
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Enter 10-digit mobile no."
+                  className="field-input pl-12 text-lg font-mono font-bold tracking-wider"
+                  inputMode="tel"
+                  autoFocus
+                  aria-label="Mobile number or Pass ID"
+                />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute right-3 rounded-full bg-slate-200 px-2 py-0.5 text-xs font-bold text-slate-600 hover:bg-slate-300"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                className="btn-navy mt-3 flex h-12 w-full items-center justify-center gap-2 text-base font-bold shadow-md"
+                disabled={busy || !query.trim()}
+              >
+                {busy ? <span className="spinner" /> : "🔍 Find Guest Details"}
+              </button>
+            </form>
+
+            <p className="mt-3 text-center text-xs text-slate-400">
+              Also accepts Pass ID (e.g. <span className="font-mono">DAC-LE-0012</span> or <span className="font-mono">12</span>)
+            </p>
+          </div>
         )}
       </div>
 
@@ -324,23 +378,28 @@ function StatBox({ label, value, sub, accent }: { label: string; value?: number;
 function ResultCard({ result, busy, onMark, onNext }: { result: Result; busy: boolean; onMark: (id: string) => void; onNext: () => void }) {
   if (result.kind === "notfound") {
     return (
-      <div onClick={onNext} className="fade-up mt-5 cursor-pointer rounded-2xl border-4 border-red-500 bg-red-50 p-6 text-center" role="alert">
-        <p className="text-3xl font-extrabold text-red-600">NO PASS FOUND</p>
-        <p className="mt-2 break-all text-slate-600">Searched: {result.query}</p>
-        <p className="mt-1 text-sm text-slate-500">Try searching by mobile number, or direct the guest to the help desk.</p>
-        <p className="mt-4 text-xs font-medium text-slate-400">Auto-clearing in 2s · Tap to scan now</p>
-        <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="btn-navy mt-3 w-full">Next guest</button>
+      <div onClick={onNext} className="fade-up mt-5 cursor-pointer rounded-2xl border-4 border-red-500 bg-red-50 p-6 text-center shadow-lg" role="alert">
+        <p className="text-3xl font-extrabold text-red-600">NO GUEST FOUND</p>
+        <p className="mt-2 font-mono text-sm font-semibold text-slate-700">Searched: {result.query}</p>
+        <p className="mt-1 text-sm text-slate-500">Check the 10-digit mobile number or register them as a walk-in at the front desk.</p>
+        <p className="mt-4 text-xs font-medium text-slate-400">Auto-clearing in 2s · Tap anywhere to retry</p>
+        <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="btn-navy mt-3 w-full">Search Again</button>
       </div>
     );
   }
 
   const p = result.pass;
+  const isPendingValid = result.kind === "valid";
   const tone =
-    result.kind === "valid" ? "border-green-500 bg-white" :
+    result.kind === "valid" ? "border-green-500 bg-white shadow-xl" :
       result.kind === "done" ? "border-green-500 bg-green-50/90" : "border-amber-500 bg-amber-50";
 
   return (
-    <div onClick={onNext} className={`fade-up mt-5 cursor-pointer rounded-2xl border-4 p-5 ${tone}`} aria-live="polite">
+    <div
+      onClick={!isPendingValid ? onNext : undefined}
+      className={`fade-up mt-5 rounded-2xl border-4 p-5 ${!isPendingValid ? "cursor-pointer" : ""} ${tone}`}
+      aria-live="polite"
+    >
       {result.kind === "done" && (
         <div className="mb-4 rounded-xl bg-green-600 p-4 text-center text-xl font-black text-white shadow-md">
           ✓ CHECKED-IN
@@ -352,23 +411,63 @@ function ResultCard({ result, busy, onMark, onNext }: { result: Result; busy: bo
         </div>
       )}
 
-      <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2 text-[15px]">
-        <dt className="text-slate-500">Name</dt><dd className="font-bold text-navy text-lg">{p.name}</dd>
-        <dt className="text-slate-500">Role</dt><dd className="font-medium text-navy">{p.participantType}</dd>
-        {p.firm && (<><dt className="text-slate-500">Firm</dt><dd className="text-navy">{p.firm}</dd></>)}
-        <dt className="text-slate-500">Persons</dt><dd className="text-2xl font-extrabold text-accent">Admit {p.persons}</dd>
-        <dt className="text-slate-500">Pass ID</dt><dd className="font-mono font-bold text-navy">{p.passId}</dd>
-      </dl>
-
-      {result.kind === "valid" && (
-        <button onClick={(e) => { e.stopPropagation(); onMark(p.passId); }} disabled={busy}
-          className="btn mt-5 h-14 w-full bg-green-600 text-lg font-extrabold text-white hover:bg-green-700">
-          {busy ? <span className="spinner" /> : "VALID – Mark Checked-in"}
-        </button>
+      {isPendingValid && (
+        <div className="mb-4 rounded-xl bg-royal/10 border border-royal/20 p-3 text-center">
+          <p className="text-xs font-bold uppercase tracking-wider text-royal">Guest Found</p>
+          <p className="text-sm font-medium text-navy">Verify details with the guest and confirm admission below.</p>
+        </div>
       )}
 
-      {result.kind !== "valid" && (
-        <p className="mt-4 text-center text-xs font-medium text-slate-500">Auto-clearing in 2s · Tap card to scan next</p>
+      <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2.5 text-[15px]">
+        <dt className="text-slate-500">Name</dt>
+        <dd className="font-bold text-navy text-lg">{p.name}</dd>
+
+        {p.mobile && (
+          <>
+            <dt className="text-slate-500">Mobile</dt>
+            <dd className="font-mono font-bold text-navy text-base">+91 {p.mobile}</dd>
+          </>
+        )}
+
+        <dt className="text-slate-500">Role</dt>
+        <dd className="font-medium text-navy">{p.participantType}</dd>
+
+        {p.firm && (
+          <>
+            <dt className="text-slate-500">Firm</dt>
+            <dd className="text-navy">{p.firm}</dd>
+          </>
+        )}
+
+        <dt className="text-slate-500">Pass ID</dt>
+        <dd className="font-mono font-bold text-navy">{p.passId}</dd>
+
+        <dt className="text-slate-500">Capacity</dt>
+        <dd className="text-2xl font-black text-green-700">
+          Admit {p.persons} {p.persons === 1 ? "Person" : "Persons"}
+        </dd>
+      </dl>
+
+      {isPendingValid ? (
+        <div className="mt-6 space-y-2.5">
+          <button
+            onClick={() => onMark(p.passId)}
+            disabled={busy}
+            className="btn flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-lg font-extrabold text-white shadow-lg hover:bg-green-700 active:scale-98 transition"
+          >
+            {busy ? <span className="spinner" /> : `✓ CONFIRM & ADMIT (${p.persons} ${p.persons === 1 ? "Person" : "Persons"})`}
+          </button>
+          <button
+            onClick={onNext}
+            className="flex h-10 w-full items-center justify-center rounded-xl bg-slate-100 text-sm font-semibold text-slate-600 hover:bg-slate-200"
+          >
+            Cancel / Back to Search
+          </button>
+        </div>
+      ) : (
+        <p className="mt-4 text-center text-xs font-medium text-slate-500">
+          Auto-clearing in 2s · Tap card to scan next
+        </p>
       )}
     </div>
   );
