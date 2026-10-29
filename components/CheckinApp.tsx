@@ -153,25 +153,24 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
   // Gate session cache: stores verified/checked-in passes in memory for 0ms duplicate detection
   const sessionCache = useRef<Map<string, { pass: Pass; time: string }>>(new Map());
 
-  // Auto-reset back to camera scanning for next guest (only for completed scans or not found, NEVER for valid pending confirmation)
+  // Auto-reset ONLY for 'done' status so staff has plenty of time to view confirmation, or tap 'Scan Next Guest'
   useEffect(() => {
-    if (!result || result.kind === "valid") return;
-    const delay = result.kind === "done" ? 1800 : result.kind === "already" ? 2600 : 2200;
+    if (!result || result.kind !== "done") return;
     const timer = setTimeout(() => {
       setResult(null);
       setError("");
-    }, delay);
+    }, 4000);
     return () => clearTimeout(timer);
   }, [result]);
 
-  // Fast 1-step checkin on QR scan: single roundtrip, no manual confirm button needed
+  // QR scan handler: pops up in the middle of screen and waits for staff to tap "Check In"
   const fastScanCheckin = useCallback(async (rawText: string) => {
     const passId = extractPassId(rawText);
     if (!passId) return;
 
     // Instant tactile feedback on detection
     if (typeof navigator !== "undefined" && navigator.vibrate) {
-      navigator.vibrate(40);
+      navigator.vibrate(50);
     }
 
     // 0ms Local Check: if already checked-in at this gate during this session, flag immediately
@@ -188,29 +187,28 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
     setBusy(true);
     setError("");
     try {
-      const d = await api("/api/checkin/mark", { passId });
+      const d = await api("/api/checkin/lookup", { query: passId });
       if (!d.found) {
         setResult({ kind: "notfound", query: passId });
         playWarningBeep();
         if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([100, 50, 100]);
-      } else if (d.alreadyCheckedIn) {
-        sessionCache.current.set(passId, { pass: d.pass, time: d.checkinTime });
-        setResult({ kind: "already", pass: d.pass, time: d.checkinTime });
+      } else if (d.pass.checkedIn) {
+        sessionCache.current.set(passId, { pass: d.pass, time: d.pass.checkinTime });
+        setResult({ kind: "already", pass: d.pass, time: d.pass.checkinTime });
         playWarningBeep();
         if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([150, 100, 150]);
       } else {
-        sessionCache.current.set(passId, { pass: d.pass, time: d.checkinTime });
-        setResult({ kind: "done", pass: d.pass, time: d.checkinTime });
+        // Pops up in the middle of the screen and stays until staff taps Check-in
+        setResult({ kind: "valid", pass: d.pass });
         playSuccessBeep();
-        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(70);
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(80);
       }
-      loadStats();
     } catch (e) {
       setError((e as Error).message + `. If this continues, call ${EVENT.phoneShort}.`);
     } finally {
       setBusy(false);
     }
-  }, [api, loadStats]);
+  }, [api]);
 
   // Manual search lookup (for typing mobile numbers or pass IDs)
   const lookup = useCallback(async (q: string) => {
@@ -466,7 +464,14 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
       {busy && !result && <p className="mt-4 flex items-center justify-center gap-2 text-slate-500"><span className="spinner !border-slate-300 !border-t-navy" /> Checking…</p>}
       {error && <p role="alert" className="mt-4 rounded-xl bg-red-50 p-3 text-center text-red-700">{error}</p>}
 
-      {result && <ResultCard result={result} busy={busy} onMark={mark} onNext={reset} />}
+      {/* Centered Modal Popup in the exact middle of the screen (does not vanish until staff actions it) */}
+      {result && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md overflow-y-auto">
+          <div className="w-full max-w-sm my-auto">
+            <ResultCard result={result} busy={busy} onMark={mark} onNext={reset} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -484,96 +489,114 @@ function StatBox({ label, value, sub, accent }: { label: string; value?: number;
 function ResultCard({ result, busy, onMark, onNext }: { result: Result; busy: boolean; onMark: (id: string) => void; onNext: () => void }) {
   if (result.kind === "notfound") {
     return (
-      <div onClick={onNext} className="fade-up mt-5 cursor-pointer rounded-2xl border-4 border-red-500 bg-red-50 p-6 text-center shadow-lg" role="alert">
-        <p className="text-3xl font-extrabold text-red-600">NO GUEST FOUND</p>
-        <p className="mt-2 font-mono text-sm font-semibold text-slate-700">Searched: {result.query}</p>
-        <p className="mt-1 text-sm text-slate-500">Check the 10-digit mobile number or register them as a walk-in at the front desk.</p>
-        <p className="mt-4 text-xs font-medium text-slate-400">Auto-clearing in 2s · Tap anywhere to retry</p>
-        <button onClick={(e) => { e.stopPropagation(); onNext(); }} className="btn-navy mt-3 w-full">Search Again</button>
+      <div className="rounded-3xl border-2 border-red-200 bg-white p-6 text-center shadow-2xl" role="alert">
+        <div className="mb-4 rounded-2xl bg-red-600 p-4 text-center text-white shadow-md">
+          <p className="text-2xl font-black">NO GUEST FOUND</p>
+          <p className="mt-1 text-xs font-mono font-medium opacity-90 break-all">Searched: {result.query}</p>
+        </div>
+        <p className="text-sm text-slate-600">Check the 10-digit mobile number or register them as a walk-in at the front desk.</p>
+        <button onClick={onNext} className="btn-navy mt-5 h-12 w-full text-base font-bold shadow-md">
+          Close / Scan Next
+        </button>
       </div>
     );
   }
 
   const p = result.pass;
   const isPendingValid = result.kind === "valid";
-  const tone =
-    result.kind === "valid" ? "border-green-500 bg-white shadow-xl" :
-      result.kind === "done" ? "border-green-500 bg-green-50/90" : "border-amber-500 bg-amber-50";
 
   return (
     <div
-      onClick={!isPendingValid ? onNext : undefined}
-      className={`fade-up mt-5 rounded-2xl border-4 p-5 ${!isPendingValid ? "cursor-pointer" : ""} ${tone}`}
+      className="rounded-3xl border-2 border-gold/40 bg-white p-6 shadow-2xl text-left"
       aria-live="polite"
     >
       {result.kind === "done" && (
-        <div className="mb-4 rounded-xl bg-green-600 p-4 text-center text-xl font-black text-white shadow-md">
-          ✓ CHECKED-IN
+        <div className="mb-4 rounded-2xl bg-green-600 p-4 text-center text-white shadow-md">
+          <p className="text-3xl font-black">✓ CHECKED-IN</p>
+          <p className="mt-0.5 text-xs font-bold uppercase tracking-wider opacity-90">Guest Admitted</p>
         </div>
       )}
+
       {result.kind === "already" && (
-        <div className="mb-4 rounded-xl bg-amber-500 p-4 text-center text-lg font-black text-white shadow-md">
-          ALREADY CHECKED-IN at {shortTime(result.time)}
+        <div className="mb-4 rounded-2xl bg-amber-500 p-4 text-center text-white shadow-md">
+          <p className="text-2xl font-black">ALREADY CHECKED-IN</p>
+          <p className="mt-0.5 text-xs font-semibold opacity-90">At {shortTime(result.time)}</p>
         </div>
       )}
 
       {isPendingValid && (
-        <div className="mb-4 rounded-xl bg-royal/10 border border-royal/20 p-3 text-center">
-          <p className="text-xs font-bold uppercase tracking-wider text-royal">Guest Found</p>
-          <p className="text-sm font-medium text-navy">Verify details with the guest and confirm admission below.</p>
+        <div className="mb-4 rounded-2xl bg-navy p-3.5 text-center text-white shadow-md">
+          <p className="text-xs font-bold uppercase tracking-widest text-gold">Entry Pass Detected</p>
+          <p className="text-base font-extrabold">Confirm Check-in Below</p>
         </div>
       )}
 
-      <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2.5 text-[15px]">
-        <dt className="text-slate-500">Name</dt>
-        <dd className="font-bold text-navy text-lg">{p.name}</dd>
+      <div className="rounded-2xl bg-slate-50 border border-slate-200/80 p-4">
+        <dl className="grid grid-cols-[auto,1fr] gap-x-4 gap-y-2.5 text-[15px]">
+          <dt className="text-slate-500 font-medium">Name</dt>
+          <dd className="font-extrabold text-navy text-lg">{p.name}</dd>
 
-        {p.mobile && (
-          <>
-            <dt className="text-slate-500">Mobile</dt>
-            <dd className="font-mono font-bold text-navy text-base">+91 {p.mobile}</dd>
-          </>
-        )}
+          {p.mobile && (
+            <>
+              <dt className="text-slate-500 font-medium">Mobile</dt>
+              <dd className="font-mono font-bold text-navy text-base">+91 {p.mobile}</dd>
+            </>
+          )}
 
-        <dt className="text-slate-500">Role</dt>
-        <dd className="font-medium text-navy">{p.participantType}</dd>
+          <dt className="text-slate-500 font-medium">Role</dt>
+          <dd className="font-semibold text-navy">{p.participantType}</dd>
 
-        {p.firm && (
-          <>
-            <dt className="text-slate-500">Firm</dt>
-            <dd className="text-navy">{p.firm}</dd>
-          </>
-        )}
+          {p.firm && (
+            <>
+              <dt className="text-slate-500 font-medium">Firm</dt>
+              <dd className="text-slate-700">{p.firm}</dd>
+            </>
+          )}
 
-        <dt className="text-slate-500">Pass ID</dt>
-        <dd className="font-mono font-bold text-navy">{p.passId}</dd>
+          <dt className="text-slate-500 font-medium">Pass ID</dt>
+          <dd className="font-mono font-bold text-navy">{p.passId}</dd>
 
-        <dt className="text-slate-500">Capacity</dt>
-        <dd className="text-2xl font-black text-green-700">
-          Admit {p.persons} {p.persons === 1 ? "Person" : "Persons"}
-        </dd>
-      </dl>
+          <dt className="text-slate-500 font-medium self-center">Capacity</dt>
+          <dd className="text-2xl font-black text-green-700">
+            Admit {p.persons} {p.persons === 1 ? "Person" : "Persons"}
+          </dd>
+        </dl>
+      </div>
 
-      {isPendingValid ? (
-        <div className="mt-6 space-y-2.5">
+      {isPendingValid && (
+        <div className="mt-5 space-y-2.5">
           <button
             onClick={() => onMark(p.passId)}
             disabled={busy}
-            className="btn flex h-14 w-full items-center justify-center gap-2 rounded-xl bg-green-600 text-lg font-extrabold text-white shadow-lg hover:bg-green-700 active:scale-98 transition"
+            className="btn flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-green-600 text-lg font-black text-white shadow-xl hover:bg-green-700 active:scale-95 transition"
           >
-            {busy ? <span className="spinner" /> : `✓ CONFIRM & ADMIT (${p.persons} ${p.persons === 1 ? "Person" : "Persons"})`}
+            {busy ? <span className="spinner" /> : `✓ CHECK-IN (Admit ${p.persons})`}
           </button>
           <button
             onClick={onNext}
-            className="flex h-10 w-full items-center justify-center rounded-xl bg-slate-100 text-sm font-semibold text-slate-600 hover:bg-slate-200"
+            className="flex h-11 w-full items-center justify-center rounded-xl bg-slate-100 text-sm font-bold text-slate-600 hover:bg-slate-200"
           >
-            Cancel / Back to Search
+            Cancel / Scan Next
           </button>
         </div>
-      ) : (
-        <p className="mt-4 text-center text-xs font-medium text-slate-500">
-          Auto-clearing in 2s · Tap card to scan next
-        </p>
+      )}
+
+      {result.kind === "done" && (
+        <button
+          onClick={onNext}
+          className="btn-navy mt-5 flex h-14 w-full items-center justify-center gap-2 rounded-2xl text-base font-bold shadow-lg"
+        >
+          Scan Next Guest
+        </button>
+      )}
+
+      {result.kind === "already" && (
+        <button
+          onClick={onNext}
+          className="btn-navy mt-5 flex h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+        >
+          Close / Scan Next
+        </button>
       )}
     </div>
   );
