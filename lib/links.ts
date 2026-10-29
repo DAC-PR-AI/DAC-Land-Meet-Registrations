@@ -33,6 +33,26 @@ export const waToNumber = (mobile10: string, text: string) =>
 
 export const waShare = (text: string) => `https://wa.me/?text=${encodeURIComponent(text)}`;
 
+/**
+ * Normalizes any QR scan string, URL, or manual input into a canonical Pass ID (e.g. DAC-LE-0001).
+ * Handles:
+ * - Direct Pass ID: "DAC-LE-0001", "dac-le-1"
+ * - Pass URLs: "https://.../pass/DAC-LE-0001?k=xyz"
+ * - Raw numbers: "1", "12", "0012"
+ */
+export function extractPassId(raw: unknown): string {
+  const s = String(raw ?? "").trim();
+  const m = s.match(/DAC-?LE-?(\d+)/i);
+  if (m) {
+    const num = parseInt(m[1], 10);
+    return `DAC-LE-${String(num).padStart(4, "0")}`;
+  }
+  if (/^\d{1,6}$/.test(s)) {
+    return `DAC-LE-${String(parseInt(s, 10)).padStart(4, "0")}`;
+  }
+  return s.toUpperCase();
+}
+
 export function gcalUrl(passUrl?: string): string {
   const details = `${EVENT.subtitle}\n\nPlease carry your Entry Pass.${passUrl ? `\nYour pass: ${passUrl}` : ""}\n\nContact: ${EVENT.phoneDisplay} | ${EVENT.email}`;
   const q = new URLSearchParams({

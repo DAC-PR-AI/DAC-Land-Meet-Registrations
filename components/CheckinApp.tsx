@@ -2,6 +2,7 @@
 
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { EVENT } from "@/lib/event";
+import { extractPassId } from "@/lib/links";
 import type { Pass, Stats } from "@/lib/types";
 import Logo from "./Logo";
 
@@ -149,10 +150,13 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
     return () => clearInterval(t);
   }, [loadStats]);
 
+  // Gate session cache: stores verified/checked-in passes in memory for 0ms duplicate detection
+  const sessionCache = useRef<Map<string, { pass: Pass; time: string }>>(new Map());
+
   // Auto-reset back to camera scanning for next guest
   useEffect(() => {
     if (!result) return;
-    const delay = result.kind === "done" ? 2200 : result.kind === "already" ? 3200 : 2600;
+    const delay = result.kind === "done" ? 1800 : result.kind === "already" ? 2600 : 2200;
     const timer = setTimeout(() => {
       setResult(null);
       setError("");
@@ -161,25 +165,44 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
   }, [result]);
 
   // Fast 1-step checkin on QR scan: single roundtrip, no manual confirm button needed
-  const fastScanCheckin = useCallback(async (q: string) => {
-    const clean = q.trim();
-    if (!clean) return;
+  const fastScanCheckin = useCallback(async (rawText: string) => {
+    const passId = extractPassId(rawText);
+    if (!passId) return;
+
+    // Instant tactile feedback on detection
+    if (typeof navigator !== "undefined" && navigator.vibrate) {
+      navigator.vibrate(40);
+    }
+
+    // 0ms Local Check: if already checked-in at this gate during this session, flag immediately
+    if (sessionCache.current.has(passId)) {
+      const cached = sessionCache.current.get(passId)!;
+      setResult({ kind: "already", pass: cached.pass, time: cached.time });
+      playWarningBeep();
+      if (typeof navigator !== "undefined" && navigator.vibrate) {
+        navigator.vibrate([120, 60, 120]);
+      }
+      return;
+    }
+
     setBusy(true);
     setError("");
     try {
-      const d = await api("/api/checkin/mark", { passId: clean });
+      const d = await api("/api/checkin/mark", { passId });
       if (!d.found) {
-        setResult({ kind: "notfound", query: clean });
+        setResult({ kind: "notfound", query: passId });
         playWarningBeep();
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([100, 50, 100]);
       } else if (d.alreadyCheckedIn) {
+        sessionCache.current.set(passId, { pass: d.pass, time: d.checkinTime });
         setResult({ kind: "already", pass: d.pass, time: d.checkinTime });
         playWarningBeep();
-        if (navigator.vibrate) navigator.vibrate([150, 100, 150]);
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate([150, 100, 150]);
       } else {
+        sessionCache.current.set(passId, { pass: d.pass, time: d.checkinTime });
         setResult({ kind: "done", pass: d.pass, time: d.checkinTime });
         playSuccessBeep();
-        if (navigator.vibrate) navigator.vibrate(80);
+        if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(70);
       }
       loadStats();
     } catch (e) {
@@ -223,9 +246,11 @@ function Desk({ pin, onUnauthorized }: { pin: string; onUnauthorized: () => void
         setResult({ kind: "notfound", query: passId });
         playWarningBeep();
       } else if (d.alreadyCheckedIn) {
+        sessionCache.current.set(passId, { pass: d.pass, time: d.checkinTime });
         setResult({ kind: "already", pass: d.pass, time: d.checkinTime });
         playWarningBeep();
       } else {
+        sessionCache.current.set(passId, { pass: d.pass, time: d.checkinTime });
         setResult({ kind: "done", pass: d.pass, time: d.checkinTime });
         playSuccessBeep();
       }
