@@ -22,7 +22,7 @@ export const EVENT = {
   // Google Calendar needs UTC: 18:00–21:00 IST = 12:30–15:30 UTC
   gcalDates: "20261029T123000Z/20261029T153000Z",
 
-  registrationClosesISO: "2026-10-29T17:00:00+05:30",
+  registrationClosesISO: "2026-10-29T22:00:00+05:30",
 
   venueName: "Ramada Plaza by Wyndham",
   venueAddress: "36, Sardar Patel Rd, Little Mount, Guindy, Chennai – 600015",
